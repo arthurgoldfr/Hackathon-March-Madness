@@ -9,85 +9,49 @@ Created on Thu Mar 26 15:01:36 2020
 import pandas as pd
 import numpy as np
 
-df = []
-MNCAA = pd.read_csv('../Data/MDataFiles_Stage1/MNCAATourneyDetailedResults.csv',",")
-MNCAA["table"]="MNCAA"
-Regular = pd.read_csv('../Data/MDataFiles_Stage1/MRegularSeasonDetailedResults.csv')
-Regular["table"]="Regular"
-df.append(MNCAA)
-df.append(Regular)
-df = pd.concat(df)
-df = df.loc[(df['Season'] >= 2003) & (df['Season'] <= 2014)]
-df = df.loc[(df['Season'] >= 2003) & (df['Season'] <= 2014)]
-df.head()
-df["WTeamID"] = df["WTeamID"].astype(str)
-df["LTeamID"] =  df["LTeamID"].astype(str)
-df["Season"] =  df["Season"].astype(str)
-df["paire"] = df["Season"]+"_"+df["WTeamID"] +"_"+ df["LTeamID"]
-def tri(x):
-    if int(x[5:9])<int(x[10:]):
-        return x
-    else :
-        return x[:4]+"_"+ x[10:]+"_"+x[5:9]
+
+
+################### IMPORT DATA ###################
+
+df = pd.read_csv('../Data/MDataFiles_Stage1/MRegularSeasonDetailedResults.csv')
+df = df.loc[(df['Season'] >= 2003) & (df['Season'] <= 2019)]
+
+################### Somme des matchs ###################
+
+df1 = df.groupby(["Season","WTeamID"]).count()["DayNum"]
+df1=df1.reset_index()
+df1.columns = ["Season","TeamID","victoires"]
+df1= df1.reindex(columns = ["Season","victoires","TeamID"] )
+df1.to_csv("Victoires.csv")
+df2 = df.groupby(["Season","LTeamID"]).count()["DayNum"]
+df2=df2.reset_index()   
+
     
-def premier(x):
-    return x[5:9]
+df2.columns = ["Season","TeamID","defaites"]
+df2 = df2.reindex(columns = ["Season","defaites","TeamID"] )
+df2.to_csv("Défaites.csv")
+df_tot = df1.merge(df2,left_on=["Season","TeamID"],right_on=["Season","TeamID"])
+df_tot.to_csv("Victoires_Défaites.csv")
+df_tot["sum_matchs"] = df_tot["victoires"]+ df_tot["defaites"]
 
-df["paire"]=df["paire"].apply(tri)
-df["ID_1"] = df["paire"].apply(lambda x:x[5:9])
-df["ID_2"] = df["paire"].apply(lambda x:x[10:])
-
-df["W/L"]= (df["WTeamID"]==df["paire"].apply(premier))
-df["W/L"]= df["W/L"].replace({True: 1, False: -1})
-def deuxieme(x):
-    return x[10:]
-df["W/L_2"]= (df["WTeamID"]==df["paire"].apply(deuxieme))
-df["W/L_2"]= df["W/L_2"].replace({True: 1, False: -1})
-df2 = df.groupby(["ID_1","table","Season"])["W/L"].sum()
-df3 = df.groupby(["ID_2","table","Season"])["W/L_2"].sum()
-df2 = df2.reset_index()
-df3 = df3.reset_index()
-new_df = pd.DataFrame()
-new_df["paire"] = df["paire"]
-new_df["Season"] = df["Season"]
-new_df["ID_1"] = df["ID_1"]
-new_df["ID_2"] = df["ID_2"]
-
-df2 = df2.loc[df2["table"]=="Regular"]
-
-df3 = df3.loc[df3["table"]=="Regular"]
-
-new_df["WTeamID"] = df["WTeamID"]
-test = new_df.merge(df2)
-new_df = test.merge(df3)
-
-#new_df.to_csv("Winner-Looser.csv")
-
-df_before = df.groupby(["ID_1","ID_2","Season","table","DayNum"]).filter(lambda x: x['DayNum'] >110)
-df_before1 = df_before.loc[df_before["table"]=="Regular"].groupby(["ID_1","Season"]).sum()["W/L"]
-df_before2 = df_before.loc[df_before["table"]=="Regular"].groupby(["ID_2","Season"]).sum()["W/L_2"]
-df_before1 = df_before1.reset_index()
-df_before2 = df_before2.reset_index()
-df_before1.rename({"W/L":"lastW_1"},axis = 1, inplace=True)
-df_before2.rename({"W/L_2":"lastW_2"},axis = 1, inplace=True)
-
-new_df = new_df.merge(df_before1)
-new_df = new_df.merge(df_before2,left_on=["ID_2","Season"],right_on=["ID_2","Season"])
-
-#new_df.to_csv("Winner-Looser-lastW.csv")
-
-df_conf = df.loc[df["table"]=="Regular"].groupby(["ID_1","ID_2","Season"]).sum()["W/L"]
-df_conf = df_conf.reset_index()
-df_conf.rename({"W/L":"confrontation"},axis = 1, inplace=True)
-new_df = new_df.merge(df_conf)
-
-new_df.to_csv("Winner-Looser-lastW-Confrontation.csv")
+################### Somme et pourcentage des derniers matchs avant le MNCAA ###################
 
 
+dfLast = df.groupby(["Season","WTeamID","DayNum"]).filter(lambda x : x['DayNum']>120).groupby(["WTeamID","Season"]).count()["DayNum"]
+dfLast =dfLast.reset_index()
+dfLast.columns = ["TeamID","Season","last_victories"]
+dfLast =  dfLast.reindex(columns = ["Season","last_victories","TeamID"] )
+#dfLast.to_csv("last_victories.csv") 
 
+dfLast2 = df.groupby(["Season","LTeamID","DayNum"]).filter(lambda x : x['DayNum']>120).groupby(["LTeamID","Season"]).count()["DayNum"]
+dfLast2 =dfLast2.reset_index()
+dfLast2.columns = ["TeamID","Season","last_defeats"]
+dfLast2 =  dfLast2.reindex(columns = ["Season","last_defeats","TeamID"] )
+#dfLast2.to_csv("last_defeats.csv")
 
-
-#new_df["WIN_ID1","WIN_ID2"]=
-
-
-
+dfLast = dfLast.merge(dfLast2)
+dfLast["pourcentage_victoires_last"] = dfLast["last_victories"]/(dfLast["last_victories"]+ dfLast["last_defeats"])
+dfLast["sum_last"] = dfLast["last_victories"]+ dfLast["last_defeats"]
+df_tot2 = df_tot.merge(dfLast,left_on=["Season","TeamID"],right_on=["Season","TeamID"],how="inner")
+df_tot2 = df_tot2.drop(["victoires","defaites","last_victories","last_defeats"],axis=1)
+#df_tot2.to_csv("features_match.csv")
